@@ -22,9 +22,9 @@ const double Kp_v = 0;
 const double Kd_v = 0;
 const double Ki_v = 0;
 // angle controller
-const double Kp_a = 950;
-const double Kd_a = 15;
-const double Ki_a = 90;
+const double Kp_a = 1100;
+const double Kd_a = 20;
+const double Ki_a = 100;
 // angle variable
 double current_angle;
 // setpoints

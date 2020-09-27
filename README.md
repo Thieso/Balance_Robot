@@ -2,6 +2,10 @@
 
 Balance Robot controlled using Arduinos. 
 
+![](Media/Robot.jpg)
+
+![](Media/Balancing.mp4)
+
 ## Hardware
 
 For the Hardware, two Arduinos are used as microcontrollers. An Arduino Uno as
@@ -12,7 +16,11 @@ controlling which increases the achievable performance.
 The Arduino Uno reads the sensor data from an MPU-9250 to get the angle of the
 robot and then computes a control signal which is send to the Arduino Nano. The
 Nano then controls the A4988 motor controllers based on this signal. The A4988
-motor controllers deliver the appropriate amount of current to the motors. 
+motor controllers deliver the appropriate amount of current to the motors. To
+make the motors more quiet and more precise, microstepping is used. There is a
+tradeoff between motor performance and stepsize. Smaller steps require more
+computational power which the Arduino might not be able to deliver. In this
+case half steps are used. 
 
 The LEDs give feedback about the current angle of the robot. The middle LED
 indicates the angle when the robot is upright. 
