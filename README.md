@@ -2,7 +2,7 @@
 
 Balance Robot controlled using Arduinos. 
 
-![](Media/Robot.jpg)
+<img src="Media/Robot.jpg" alt="drawing" width="300"/>
 
 ![](Media/Balancing.gif)
 
