@@ -1,12 +1,13 @@
 // include relevant libraries
 #include <Arduino.h>
-#include <SPI.h>
+#include <Wire.h>
 #include <AccelStepper.h>
 
-// variables for SPI communications
-byte buff[4];
-volatile byte indx;
-volatile boolean process;
+// define slave address of arduino
+#define SLAVE_ADDR 9
+
+// byte array to send over I2C
+byte bytesToSend[2];
 
 // Define maximum motor performance parameters
 #define MAX_SPEED 2000
@@ -40,6 +41,7 @@ bool serial_received = false;
 unsigned long current_time, elapsed_time, prev_time = 0;
 
 // control signal (to be read from other arduino)
+byte b1, b2;
 int u_a = 0;
 int u_a_read = 0;
 
@@ -64,19 +66,42 @@ void setMicrosteps(int motor, int ms1, int ms2, int ms3) {
 }
 
 // ================================================================
+// ===                    I2C receive function                  ===
+// ================================================================
+void receiveEvent() {
+  // read one character from the I2C
+    if (Wire.available() >= 2) {
+        b1 = Wire.read();
+        b2 = Wire.read();
+        u_a = b1;
+        u_a = (u_a << 8) | b2;
+        left_motor.setMaxSpeed(u_a);
+        right_motor.setMaxSpeed(u_a);
+    }
+}
+
+// ================================================================
+// ===                    I2C request function                  ===
+// ================================================================
+void requestEvent() {
+    bytesToSend[0] = (vel_send >> 8) & 0xFF;
+    bytesToSend[1] = vel_send & 0xFF;
+    Wire.write(bytesToSend, 2); // respond with message of 2 bytes
+    // as expected by master
+}
+
+
+// ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
-
 void setup() {
     // start serial
     Serial.begin(9600);
 
-    // SPI setup
-    pinMode(MISO, OUTPUT); // have to send on master in so it set as output
-    SPCR |= _BV(SPE); // turn on SPI in slave mode
-    indx = 0; // buffer empty
-    process = false;
-    SPI.attachInterrupt(); // turn on interrupt
+    // I2C setup
+    Wire.begin(SLAVE_ADDR);
+    Wire.onReceive(receiveEvent);
+    Wire.onRequest(requestEvent);
 
     // set microstepping for the motors
     pinMode(MS1_L, OUTPUT);
@@ -96,73 +121,15 @@ void setup() {
     right_motor.setAcceleration(MAX_ACCELERATION);
     right_motor.setSpeed(0);
 
-    // wait for SPI data to come in
-    while (indx == 0) 
+    // wait for I2C data to come in
+    while (u_a == 0) 
         delay(100);
 }
 
 // ================================================================
-// ===                    SPI interrupt routine                 ===
-// ================================================================
-//
-ISR (SPI_STC_vect) 
-{ 
-    byte c = SPDR; // read byte from SPI Data Register
-    if (indx < sizeof buff) {
-        buff[indx] = c; // save data in the next index in the array buff
-        indx++; // increment the index
-        if (c == 0xCC) //check for the end of the word
-            process = true;
-    }
-}
-
-
-// ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
-
 void loop() {
-    // receive the control signal from analog input
-    //if (Serial.available() >= 3) {
-        //startByte = Serial.read();
-        //if (startByte == 0xCC) {
-            //b1 = Serial.read();
-            //b2 = Serial.read();
-            //u_a = b1 * 256 + b2;
-            //u_a *= 2;
-            //serial_received = true;
-            //// set the max motor speed to which it accelerates
-            //left_motor.setMaxSpeed(u_a);
-            //right_motor.setMaxSpeed(u_a);
-            //// adapt the microstep setting to have the smallest microstepping
-            //// possible at any time
-            ////if (MAX_SPEED / abs(u_a) > 4) {
-                ////u_a *= 4;
-                ////setMicrosteps(0, HIGH, HIGH, LOW);
-                ////setMicrosteps(1, HIGH, HIGH, LOW);
-            ////} else if (MAX_SPEED / abs(u_a) > 2) {
-                ////u_a *= 2;
-                ////setMicrosteps(0, LOW, HIGH, LOW);
-                ////setMicrosteps(1, LOW, HIGH, LOW);
-            ////} else {
-                ////setMicrosteps(0, HIGH, LOW, LOW);
-                ////setMicrosteps(1, HIGH, LOW, LOW);
-            ////}
-        //}
-    //}
-    if (process) {
-        process = false; //reset the process
-        u_a_read = buff[0] * 256 + buff[1];
-        if (abs(u_a_read) <= MAX_SPEED) {
-            u_a = abs(u_a_read);
-            if (buff[2] != 0x00)
-                u_a *= -1;
-            left_motor.setMaxSpeed(u_a);
-            right_motor.setMaxSpeed(u_a);
-        }
-        Serial.println(u_a); //print the array on serial monitor
-        indx = 0; //reset button to zero
-    }
 
     // set motor spinning direction for left motor, right motor tries to find
     // the same position as left motor to sync them
@@ -173,35 +140,24 @@ void loop() {
     }
     right_motor.moveTo(left_motor.currentPosition() * -1);
 
-    // if serial was read, speed can be written to serial
-    //if (serial_received == true) {
-        //// compute new time variables
-        //current_time = millis();
-        //elapsed_time = current_time - prev_time;
-        //prev_time = current_time;
+    // compute new time variables
+    current_time = millis();
+    elapsed_time = current_time - prev_time;
 
-        //// compute motor speed
-        ////pos_L = left_motor.currentPosition();
-        ////pos_R = right_motor.currentPosition();
-        ////vel_L = (pos_L - prev_pos_L) / elapsed_time;
-        ////vel_R = (pos_R - prev_pos_R) / elapsed_time;
-        ////vel_mean = 0.5 * (vel_L + vel_R);
-        ////vel_send = int(vel_mean);
-        ////prev_pos_L = pos_L;
-        ////prev_pos_R = pos_R;
-        //vel_send = 0;
-
-        //// send velocity over serial
-        //Serial.write(0xCC);
-        //Serial.write(vel_send / 256);
-        //Serial.write(vel_send % 256);
-        
-        //serial_received = false;
-    //}
+    // compute motor speed
+    if (elapsed_time > 100) {
+        prev_time = current_time;
+        pos_L = left_motor.currentPosition();
+        pos_R = right_motor.currentPosition();
+        vel_L = 1000 * (pos_L - prev_pos_L) / elapsed_time;
+        vel_R = 1000 * (pos_R - prev_pos_R) / elapsed_time;
+        vel_mean = 0.5 * (vel_L + vel_R);
+        vel_send = int(vel_mean);
+        prev_pos_L = pos_L;
+        prev_pos_R = pos_R;
+    }
 
     // run the motors
-    //right_motor.runSpeed();
-    //left_motor.runSpeed();
     right_motor.run();
     left_motor.run();
 }

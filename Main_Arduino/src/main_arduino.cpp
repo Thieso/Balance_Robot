@@ -1,9 +1,16 @@
 // include relevant libraries
 #include <Arduino.h>
-#include <SPI.h>
+#include <Wire.h>
 #include <PID_v1.h>
 #include <MPU9250.h>
 #include "eeprom_utils.h"
+#include <SoftwareSerial.h>
+
+// create Software Serial object
+SoftwareSerial btSerial(2, 3);
+
+// slave address of other arduino
+#define SLAVE_ADDR 9
 
 // max angle to show on LEDs
 #define MAX_ANGLE 18
@@ -18,13 +25,13 @@
 
 // define controller parameters
 // velocity controller
-const double Kp_v = 0;
+const double Kp_v = 0.001;
 const double Kd_v = 0;
 const double Ki_v = 0;
 // angle controller
-const double Kp_a = 1100;
-const double Kd_a = 20;
-const double Ki_a = 100;
+const double Kp_a = 1300;
+const double Kd_a = 30;
+const double Ki_a = 150;
 // angle variable
 double current_angle;
 // setpoints
@@ -33,7 +40,11 @@ double sp_v = 0; // [m/s]
 double u_v = 0;
 double u_a = 0;
 int u_a_send = 0;
+// bytes for SPI comms
+byte bytesToSend[2];
+byte b1, b2;
 //current speed of vehicle
+int speed_read = 0;
 double current_speed = 0;
 
 // define PID controller objects
@@ -57,8 +68,6 @@ class  FilterBuLp1
             v[0] = v[1];
             v[1] = (6.244035046342855111e-3 * x)
                  + (0.98751192990731428978 * v[0]);
-            //v[1] = (5.919070381840546569e-2 * x)
-                 //+ (0.88161859236318906863 * v[0]);
             return (v[0] + v[1]);
         }
 };
@@ -75,10 +84,8 @@ void setup() {
     // start serial
     Serial.begin(9600);
 
-    // start SPI communications
-    digitalWrite(SS, HIGH); // disable Slave Select
-    SPI.begin();
-    SPI.setClockDivider(SPI_CLOCK_DIV8);//divide the clock by 8
+    // start software serial
+    btSerial.begin(9600);
 
     // setup LED pins as output and turn them on and off to see if they work
     pinMode(LED_PIN_1, OUTPUT);
@@ -117,7 +124,7 @@ void setup() {
     // wait for angle to stabalize
     do {
         mpu.update();
-    } while(mpu.getRoll() > 18);
+    } while(mpu.getRoll() > 16);
 
     // set PID sample time
     PID_velocity.SetSampleTime(20);
@@ -148,15 +155,14 @@ void loop() {
     current_angle = filter.step(mpu.getRoll());
 
     // get current speed 
-    //if (Serial.available() >= 3) {
-        //startByte = Serial.read();
-        //if (startByte == 0xCC) {
-            //b1 = Serial.read();
-            //b2 = Serial.read();
-            //current_speed = b1 * 256 + b2;
-        //}
-    //}
-    current_speed = 0;
+    Wire.requestFrom(SLAVE_ADDR, 2);
+    if(Wire.available() >= 2) {
+        b1 = Wire.read();
+        b2 = Wire.read();
+    }
+    speed_read = b1;
+    speed_read = (speed_read << 8) | b2;
+    current_speed = speed_read;
 
     // compute new controller values
     PID_velocity.Compute();
@@ -169,29 +175,24 @@ void loop() {
 
     // set the value to send to other arduino
     u_a_send = (int) u_a;
-    u_a_send = abs(u_a_send);
-
 
     // write control signal to other arduino (with 0xCC as start byte)
-    digitalWrite(SS, LOW); // enable Slave Select
-    // send test string
-    SPI.transfer(u_a_send / 256);
-    SPI.transfer(u_a_send % 256);
-    if (u_a > 0)
-        SPI.transfer(0x00);
-    else
-        SPI.transfer(0x01);
-    SPI.transfer(0xCC);
-    digitalWrite(SS, HIGH); // disable Slave Select
+    Wire.beginTransmission(SLAVE_ADDR);
+    bytesToSend[0] = (u_a_send >> 8) & 0xFF;
+    bytesToSend[1] = u_a_send & 0xFF;
+    Wire.write(bytesToSend, 2);
+    Wire.endTransmission();
 
-    //Serial.print(current_angle);
+    Serial.println(current_angle);
+    btSerial.println(u_a);
+    
     //Serial.print("\t");
-    //Serial.print(current_speed);
+    //Serial.println(speed_read);
     //Serial.print("\t");
     //Serial.print(u_v);
     //Serial.print("\t");
-    if (u_a > 0)
-        Serial.println(u_a_send);
-    else
-        Serial.println(-u_a_send);
+    //if (u_a > 0)
+        //Serial.println(u_a_send);
+    //else
+        //Serial.println(-u_a_send);
 }
