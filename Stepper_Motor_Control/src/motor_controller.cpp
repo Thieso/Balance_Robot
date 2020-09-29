@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <AccelStepper.h>
+#include <MultiStepper.h>
 
 // define slave address of arduino
 #define SLAVE_ADDR 9
@@ -10,8 +11,8 @@
 byte bytesToSend[2];
 
 // Define maximum motor performance parameters
-#define MAX_SPEED 2000
-#define MAX_ACCELERATION 6000
+#define MAX_SPEED 1500
+#define MAX_ACCELERATION 6500
 
 // Define pin connections
 #define DIR_PIN_R 2
@@ -45,6 +46,9 @@ byte b1, b2;
 int u_a = 0;
 int u_a_read = 0;
 
+// desired motor position (for direction setting)
+long positions[2];
+
 // Define motor interface type
 #define motorInterfaceType 1
 
@@ -52,16 +56,14 @@ int u_a_read = 0;
 AccelStepper left_motor(motorInterfaceType, STEP_PIN_L, DIR_PIN_L);
 AccelStepper right_motor(motorInterfaceType, STEP_PIN_R, DIR_PIN_R);
 
+MultiStepper steppers;
+
 // helper function to set microstep size
 void setMicrosteps(int motor, int ms1, int ms2, int ms3) {
     if (motor == 0) {
         digitalWrite(MS1_L, ms1);
-        //digitalWrite(MS2_L, ms2);
-        //digitalWrite(MS3_L, ms3);
     } else {
         digitalWrite(MS1_R, ms1);
-        //digitalWrite(MS2_R, ms2);
-        //digitalWrite(MS3_R, ms3);
     }
 }
 
@@ -101,15 +103,11 @@ void setup() {
     // I2C setup
     Wire.begin(SLAVE_ADDR);
     Wire.onReceive(receiveEvent);
-    Wire.onRequest(requestEvent);
+    //Wire.onRequest(requestEvent);
 
     // set microstepping for the motors
     pinMode(MS1_L, OUTPUT);
-    //pinMode(MS2_L, OUTPUT);
-    //pinMode(MS3_L, OUTPUT);
     pinMode(MS1_R, OUTPUT);
-    //pinMode(MS2_R, OUTPUT);
-    //pinMode(MS3_R, OUTPUT);
     setMicrosteps(0, HIGH, LOW, LOW);
     setMicrosteps(1, HIGH, LOW, LOW);
 
@@ -121,6 +119,9 @@ void setup() {
     right_motor.setAcceleration(MAX_ACCELERATION);
     right_motor.setSpeed(0);
 
+    steppers.addStepper(left_motor);
+    steppers.addStepper(right_motor);
+
     // wait for I2C data to come in
     while (u_a == 0) 
         delay(100);
@@ -131,33 +132,16 @@ void setup() {
 // ================================================================
 void loop() {
 
-    // set motor spinning direction for left motor, right motor tries to find
-    // the same position as left motor to sync them
+    // set motor spinning direction for the steppers
     if (u_a > 0) {
-        left_motor.moveTo(-10000);
+        positions[0] = -10000;
+        positions[1] = 10000;
     } else {
-        left_motor.moveTo(10000);
+        positions[0] = 10000;
+        positions[1] = -10000;
     }
-    right_motor.moveTo(left_motor.currentPosition() * -1);
-
-    // compute new time variables
-    current_time = millis();
-    elapsed_time = current_time - prev_time;
-
-    // compute motor speed
-    if (elapsed_time > 100) {
-        prev_time = current_time;
-        pos_L = left_motor.currentPosition();
-        pos_R = right_motor.currentPosition();
-        vel_L = 1000 * (pos_L - prev_pos_L) / elapsed_time;
-        vel_R = 1000 * (pos_R - prev_pos_R) / elapsed_time;
-        vel_mean = 0.5 * (vel_L + vel_R);
-        vel_send = int(vel_mean);
-        prev_pos_L = pos_L;
-        prev_pos_R = pos_R;
-    }
+    steppers.moveTo(positions);
 
     // run the motors
-    right_motor.run();
-    left_motor.run();
+    steppers.run();
 }

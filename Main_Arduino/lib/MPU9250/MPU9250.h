@@ -348,24 +348,24 @@ private:
 
     void updateRPY()
     {
-        a12 =   2.0f * (q[1] * q[2] + q[0] * q[3]);
-        a22 =   q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3];
+        //a12 =   2.0f * (q[1] * q[2] + q[0] * q[3]);
+        //a22 =   q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3];
         a31 =   2.0f * (q[0] * q[1] + q[2] * q[3]);
-        a32 =   2.0f * (q[1] * q[3] - q[0] * q[2]);
+        //a32 =   2.0f * (q[1] * q[3] - q[0] * q[2]);
         a33 =   q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3];
-        pitch = -asinf(a32);
+        //pitch = -asinf(a32);
         roll  = atan2f(a31, a33);
-        yaw   = atan2f(a12, a22);
-        pitch *= 180.0f / PI;
+        //yaw   = atan2f(a12, a22);
+        //pitch *= 180.0f / PI;
         roll  *= 180.0f / PI;
-        yaw   *= 180.0f / PI;
-        yaw   += magnetic_declination;
-        if      (yaw >= +180.f) yaw -= 360.f;
-        else if (yaw <  -180.f) yaw += 360.f;
+        //yaw   *= 180.0f / PI;
+        //yaw   += magnetic_declination;
+        //if      (yaw >= +180.f) yaw -= 360.f;
+        //else if (yaw <  -180.f) yaw += 360.f;
 
-        lin_ax = a[0] + a31;
-        lin_ay = a[1] + a32;
-        lin_az = a[2] - a33;
+        //lin_ax = a[0] + a31;
+        //lin_ay = a[1] + a32;
+        //lin_az = a[2] - a33;
     }
 
     int16_t readTempData()
