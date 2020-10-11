@@ -1,6 +1,6 @@
 # Balance Robot
 
-Balance Robot controlled using Arduinos. 
+Balance Robot controlled using an Arduino Due. 
 
 <img src="Media/Robot.jpg" alt="drawing" width="300"/>
 
@@ -8,27 +8,25 @@ Balance Robot controlled using Arduinos.
 
 ## Hardware
 
-For the Hardware, two Arduinos are used as microcontrollers. An Arduino Uno as
-the main controller and an Arduino Nano as a motor controller. This is done
-because then the motor controller can focus all its resources on motor
-controlling which increases the achievable performance. 
+For the Hardware, an Arduino Due is used as a microcontroller. The Due has
+higher performance than the typical Uno/Nano which is needed to drive the
+motors.
 
-The Arduino Uno reads the sensor data from an MPU-9250 to get the angle of the
-robot and then computes a control signal which is send to the Arduino Nano. The
-Nano then controls the A4988 motor controllers based on this signal. The A4988
-motor controllers deliver the appropriate amount of current to the motors. To
-make the motors more quiet and more precise, microstepping is used. There is a
-tradeoff between motor performance and stepsize. Smaller steps require more
-computational power which the Arduino might not be able to deliver. In this
-case half steps are used. 
+The Arduino reads the sensor data from an MPU-9250 to get the angle of the robot
+and then computes a PID control signal which is send to the  A4988 motor
+controllers. The A4988 motor controllers deliver the appropriate amount of
+current to the motors. To make the motors more quiet and more precise,
+microstepping is used. There is a tradeoff between motor performance and
+stepsize. Smaller steps require more computational power which the Arduino might
+not be able to deliver. In this case quarter steps are used. 
 
 The LEDs give feedback about the current angle of the robot. The middle LED
 indicates the angle when the robot is upright. 
 
 The power is provided by a 3 Cell Lipo. This is connected directly to the A4988
-controllers as motor voltage input. For the Arduinos the voltage is reduced
+controllers as motor voltage input. For the Arduino the voltage is reduced
 using a DC-DC converter to about 7-12V. 
-The MPU-9250 sensor is powered by the 5V output of the Arduinos which also power
+The MPU-9250 sensor is powered by a 3.3V DC-DC converter output which also power
 the internal logic of the A4988 controllers. 
 
 The wiring is shown in the following picture. 
